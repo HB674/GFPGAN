@@ -1,0 +1,67 @@
+FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# 기본 패키지
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    build-essential \
+    python3.10 \
+    python3.10-dev \
+    python3-pip \
+    ffmpeg \
+    nano \
+ && rm -rf /var/lib/apt/lists/* \
+ && apt-get clean
+
+# 소스 복사
+COPY . /app
+
+# python/py3 기본 지정
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1 \
+ && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
+
+# pip 최신화
+RUN python3 -m pip install --upgrade pip
+
+# --- 핵심: 먼저 numpy<2.0 고정 설치 (추가 패키지가 끌어올리는 걸 방지) ---
+RUN python3 -m pip install --no-cache-dir "numpy==1.26.4"
+
+# 런타임 필수 패키지
+RUN python3 -m pip install --no-cache-dir \
+    fastapi \
+    uvicorn \
+    python-multipart \
+    opencv-python-headless \
+    gfpgan \
+    basicsr \
+    facexlib \
+    realesrgan
+
+# PyTorch/cu121
+RUN python3 -m pip install --no-cache-dir \
+    torch==2.1.0+cu121 \
+    torchvision==0.16.0+cu121 \
+    torchaudio==2.1.0+cu121 \
+    --index-url https://download.pytorch.org/whl/cu121
+
+# (선택) 프로젝트별 추가 의존성
+# 주의: requirements.txt에 torch/opencv/gfpgan/numpy가 있다면 충돌 가능성 → 빼두시는 걸 권장
+# RUN python3 -m pip install --no-cache-dir -r requirements.txt
+
+# --- 안전장치: 혹시 중간에 numpy가 다시 2.x로 끌어올려졌다면, 최종적으로 1.26.4로 강제 덮어쓰기 ---
+RUN python3 -m pip uninstall -y numpy && \
+    python3 -m pip install --no-cache-dir "numpy==1.26.4" && \
+    python3 - <<'PY'
+import numpy as np
+print("✅ NumPy pinned to:", np.__version__)
+PY
+
+EXPOSE 8004
+
+# gfpgan_api_server.py의 FastAPI app을 구동
+CMD ["python3", "-m", "uvicorn", "gfpgan_api_server:app", "--host", "0.0.0.0", "--port", "8004"]
