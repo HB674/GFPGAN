@@ -14,6 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.10-dev \
     python3-pip \
     ffmpeg \
+    wget \                
+    ca-certificates \ 
     nano \
  && rm -rf /var/lib/apt/lists/* \
  && apt-get clean
@@ -48,6 +50,17 @@ RUN python3 -m pip install --no-cache-dir \
     torchvision==0.16.0+cu121 \
     torchaudio==2.1.0+cu121 \
     --index-url https://download.pytorch.org/whl/cu121
+    
+# --- 모델 가중치 다운로드 ---
+RUN mkdir -p experiments/pretrained_models gfpgan/weights && \
+    wget -L https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth \
+         -O experiments/pretrained_models/GFPGANv1.3.pth && \
+    wget -L https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth \
+         -P gfpgan/weights && \
+    wget -L https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth \
+         -P gfpgan/weights && \
+    wget -L https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth \
+         -P gfpgan/weights
 
 # (선택) 프로젝트별 추가 의존성
 # 주의: requirements.txt에 torch/opencv/gfpgan/numpy가 있다면 충돌 가능성 → 빼두시는 걸 권장
